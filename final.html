@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<head>
+	<meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
+	<title>Hello, AR Maps!</title>
+	<!-- include three.js library -->
+	<script src='js/three.js'></script>
+	<!-- include jsartookit -->
+	<script src="jsartoolkit5/artoolkit.min.js"></script>
+	<script src="jsartoolkit5/artoolkit.api.js"></script>
+	<!-- include threex.artoolkit -->
+	<script src="threex/threex-artoolkitsource.js"></script>
+	<script src="threex/threex-artoolkitcontext.js"></script>
+	<script src="threex/threex-arbasecontrols.js"></script>
+	<script src="threex/threex-armarkercontrols.js"></script>
+	<script src="threex/threex-arsmoothedcontrols.js"></script>
+</head>
+
+<body style='margin : 0px; overflow: hidden; font-family: Monospace;'>
+
+<!-- 
+  Example created by Lee Stemkoski: https://github.com/stemkoski
+  Based on the AR.js library and examples created by Jerome Etienne: https://github.com/jeromeetienne/AR.js/
+-->
+
+<script>
+
+var scene, camera, renderer, clock, deltaTime, totalTime;
+
+var arToolkitSource, arToolkitContext, smoothedControls;
+
+var markerRoot1;
+
+fetch('http://127.0.0.1:5000/call_python_function', {
+    method: 'POST',
+})
+.then(response => response.json())
+.then(data => {
+    // Handle the result returned by the Python function
+    console.log(data.norm);
+	console.log("====================================");
+	console.log(data.xcent);
+	console.log("====================================");
+	console.log(data.ycent);	
+
+	var polygonsInfo = data.norm;
+	var polygons_x_center = data.xcent;
+	var polygons_y_center = data.ycent;
+
+
+	// var polygonsInfo =[ 
+	// 	[(-0.0037332350613041854, 0.0025414781227937056), (-0.002437935061308849, 0.0013113781227929167), (-0.0022689350613092074, 0.0014691781227931244), (-0.0020931350613011546, 0.0016352781227944035), (-0.0029886350612997603, 0.002485678122791768), (-0.002882535061303315, 0.0025853781227915817), (-0.0032822350613059825, 0.0029649781227938377)],
+	// 	[(0.0013107649386938647, -0.0002270218772082444), (0.0012843649386979905, -0.0002004218772064803), (0.001270864938703653, -0.00016622187720827242), (0.0012722649386915919, -0.0001298218772056714), (0.0012882649386938283, -9.662187720849147e-05), (0.0013164649386965266, -7.172187720883016e-05), (0.0013526649386932377, -5.902187720607799e-05), (0.0013912649386895737, -6.032187720705906e-05), (0.0014263649386947463, -7.542187720588345e-05), (0.0014526649386965573, -0.00010212187720881616), (0.0014661649386908948, -0.00013622187720585544), (0.0014648649386970192, -0.00017272187720607235), (0.0014488649386947827, -0.00020582187720563638), (0.0014205649386980213, -0.0002307218772088504), (0.0013844649386953733, -0.00024342187720804986), (0.0013458649386990373, -0.0002422218772082374)]
+	// ];
+
+
+	initialize();
+	animate();
+
+	function initialize()
+	{
+		scene = new THREE.Scene();
+
+		let ambientLight = new THREE.AmbientLight( 0xcccccc, 0.5 );
+		scene.add( ambientLight );
+					
+		camera = new THREE.Camera();
+		scene.add(camera);
+
+		renderer = new THREE.WebGLRenderer({
+			antialias : true,
+			alpha: true
+		});
+		renderer.setClearColor(new THREE.Color('lightgrey'), 0)
+		renderer.setSize( 640, 480 );
+		renderer.domElement.style.position = 'absolute'
+		renderer.domElement.style.top = '0px'
+		renderer.domElement.style.left = '0px'
+		document.body.appendChild( renderer.domElement );
+
+		clock = new THREE.Clock();
+		deltaTime = 0;
+		totalTime = 0;
+		
+		////////////////////////////////////////////////////////////
+		// setup arToolkitSource
+		////////////////////////////////////////////////////////////
+
+		arToolkitSource = new THREEx.ArToolkitSource({
+			sourceType : 'webcam',
+		});
+
+		function onResize()
+		{
+			arToolkitSource.onResize()	
+			arToolkitSource.copySizeTo(renderer.domElement)	
+			if ( arToolkitContext.arController !== null )
+			{
+				arToolkitSource.copySizeTo(arToolkitContext.arController.canvas)	
+			}	
+		}
+
+		arToolkitSource.init(function onReady(){
+			onResize()
+		});
+		
+		// handle resize event
+		window.addEventListener('resize', function(){
+			onResize()
+		});
+		
+		////////////////////////////////////////////////////////////
+		// setup arToolkitContext
+		////////////////////////////////////////////////////////////	
+
+		// create atToolkitContext
+		arToolkitContext = new THREEx.ArToolkitContext({
+			cameraParametersUrl: 'data/camera_para.dat',
+			detectionMode: 'mono'
+		});
+		
+		// copy projection matrix to camera when initialization complete
+		arToolkitContext.init( function onCompleted(){
+			camera.projectionMatrix.copy( arToolkitContext.getProjectionMatrix() );
+		});
+
+		////////////////////////////////////////////////////////////
+		// setup markerRoots
+		////////////////////////////////////////////////////////////
+
+		// build markerControls
+		markerRoot1 = new THREE.Group();
+		scene.add(markerRoot1);
+		
+		let markerControls1 = new THREEx.ArMarkerControls(arToolkitContext, markerRoot1, {
+			type : 'pattern',
+			patternUrl : "data/hiro.patt",
+		})
+
+		// interpolates from last position to create smoother transitions when moving.
+		// parameter lerp values near 0 are slow, near 1 are fast (instantaneous).
+		let smoothedRoot = new THREE.Group();
+		scene.add(smoothedRoot);
+		smoothedControls = new THREEx.ArSmoothedControls(smoothedRoot, {
+			lerpPosition: 0.8,
+			lerpQuaternion: 0.8,
+			lerpScale: 1,
+			// minVisibleDelay: 1,
+			// minUnvisibleDelay: 1,
+		});
+
+
+
+		// Create and add cubes based on the polygonsInfo dictionary
+		for (var i = 0; i < polygonsInfo.length; i++) {
+		// for (var i = 0; i < 1; i++) {			
+			var polyInfo = polygonsInfo[i];
+
+			var baseShape = new THREE.Shape();
+			start_point=polyInfo[0];
+			start_x=start_point[0];
+			start_y=start_point[1];
+			cent_x_coord=polygons_x_center[i];
+			cent_y_coord=polygons_y_center[i];
+			baseShape.moveTo(start_x,start_y);
+			for (var j = 1; j < polyInfo.length; j++) {
+				baseShape.lineTo(polyInfo[j][0],polyInfo[j][1]);
+			}
+
+
+			function generateRandomNumber() {
+				// Generate a random number between 0 and 1
+				const random = Math.random();
+
+				if (random < 0.5) {
+					// 20% chance of generating 1
+					return 1;
+				} else if (random < 0.99) {
+					// 20% chance of generating 2
+					return 2;
+				} else {
+					// 20% chance of generating 5
+					return 4;
+				}
+			}
+
+			// Example usage:
+			var randheight = generateRandomNumber();
+
+			var extrudeSettings = {
+				steps: randheight,  // Number of steps in the extrusion (height)
+				depth: 10,  // Set depth to 0 to rest on the face
+				bevelEnabled: false,  // No beveling
+				// bevelOffset: -20000,
+				// bevelSize:0,
+				// bevelThickness: 0.001,
+			};
+			var geometry = new THREE.ExtrudeGeometry(baseShape, extrudeSettings);
+
+			var material = new THREE.MeshNormalMaterial({
+				transparent: true,
+				opacity: 0.5,
+				side: THREE.DoubleSide
+			});
+
+			var building = new THREE.Mesh(geometry, material);
+
+			building.position.set(cent_x_coord*6,  cent_y_coord*6, 0);
+			building.rotation.set(-Math.PI / 2, 0, 0);
+			building.scale.set(1, 1, 0.005);
+			smoothedRoot.add(building);
+		}
+
+
+	}
+
+
+	function update()
+	{
+		// update artoolkit on every frame
+		if ( arToolkitSource.ready !== false )
+			arToolkitContext.update( arToolkitSource.domElement );
+			
+		// additional code for smoothed controls
+		smoothedControls.update(markerRoot1);
+	}
+
+
+	function render()
+	{
+		renderer.render( scene, camera );
+	}
+
+
+	function animate()
+	{
+		requestAnimationFrame(animate);
+		deltaTime = clock.getDelta();
+		totalTime += deltaTime;
+		update();
+		render();
+	}
+
+
+
+
+})
+.catch(error => {
+    console.error('Error:', error);
+});
+
+
+
+
+
+
+</script>
+
+</body>
+</html>
