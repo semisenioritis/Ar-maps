@@ -14,6 +14,8 @@ open flask server on default flask server for python code
 open on browser: 
 http://localhost:8000/final.html
 
+use the Hiro tracker to visualize the map
+
 todo:
 
 port forwarding for mobile access
