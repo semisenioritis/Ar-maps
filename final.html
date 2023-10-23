@@ -210,6 +210,29 @@ fetch('http://127.0.0.1:5000/call_python_function', {
 			smoothedRoot.add(building);
 		}
 
+// Create a cone geometry
+var coneGeometry = new THREE.ConeGeometry(5.2, 2, 32); // Parameters: radius, height, radialSegments
+
+// Create a material for the cone (you can change the color)
+var coneMaterial = new THREE.MeshBasicMaterial({ 
+	color: 0xC4A484,
+	transparent: true,
+	opacity: 0.3,
+	side: THREE.DoubleSide
+
+}); // Red color
+
+// Create a mesh using the geometry and material
+var coneMesh = new THREE.Mesh(coneGeometry, coneMaterial);
+
+// Add the cone mesh to the scene
+smoothedRoot.add(coneMesh);
+
+// Set the position of the cone mesh
+
+coneMesh.rotation.set(0 , Math.PI, 0);
+coneMesh.position.set(0, -2, 0); 
+
 
 	}
 
