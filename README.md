@@ -21,3 +21,5 @@ todo:
 port forwarding for mobile access
 
 use lat and long from current location.
+
+add image as base holder
