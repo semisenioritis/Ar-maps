@@ -23,3 +23,7 @@ port forwarding for mobile access
 use lat and long from current location.
 
 add image as base holder
+
+add red dot for center aka your coords
+
+add building heights to make the buildings more dynamic and accurate: https://wiki.openstreetmap.org/wiki/Key:building:levels
